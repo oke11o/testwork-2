@@ -1,5 +1,9 @@
 # Тестовое задание
 
+## Задание 2
+
+файл `run_counter.php`
+
 ## Сумма больших чисел
 
 Сервис:
@@ -11,3 +15,5 @@
 ```php
 \Tests\App\Service\CalculatorTest
 ```
+
+
