@@ -2,7 +2,9 @@
 
 namespace Tests\App\Service;
 
+use App\Service\BigNumberFormatter;
 use App\Service\Calculator;
+use App\Service\SumArgumentsFactory;
 
 class CalculatorTest extends \PHPUnit\Framework\TestCase
 {
@@ -34,7 +36,7 @@ class CalculatorTest extends \PHPUnit\Framework\TestCase
      */
     public function invalidArgument($a, $b)
     {
-        $calculator = new Calculator();
+        $calculator = new Calculator(new BigNumberFormatter(), new SumArgumentsFactory());
         $calculator->sum($a, $b);
     }
 
@@ -75,13 +77,18 @@ class CalculatorTest extends \PHPUnit\Framework\TestCase
      */
     public function sum($a, $b, $sum)
     {
-        $calculator = new Calculator();
+        $calculator = new Calculator(new BigNumberFormatter(), new SumArgumentsFactory());
         $this->assertEquals($sum, $calculator->sum($a, $b));
     }
 
     public function examples()
     {
         return [
+            [
+                'a' => '.0',
+                'b' => '.5',
+                'sum' => '0.5',
+            ],
             [
                 'a' =>    '7777777777777777777777777774777775.7777777777777777777777777777777777777777777777',
                 'b' =>    '8888888888888888888888888884888885.8888888888888888888888888888888888888888888888',

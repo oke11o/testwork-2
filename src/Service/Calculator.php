@@ -3,23 +3,31 @@
 namespace App\Service;
 
 use App\Exception\CalculatorException;
+use App\Model\BigNumber;
+use App\Model\SumArguments;
 
 class Calculator
 {
     const INTEGER_PART = 'INTEGER_PART';
     const FRACTIONAL_PART = 'FRACTIONAL_PART';
     /**
-     * @var string
+     * @var BigNumberFormatter
      */
-    private $fractionalSeparator;
+    private $formatter;
+    /**
+     * @var SumArgumentsFactory
+     */
+    private $sumArgumentsFactory;
 
     /**
      * Calculator constructor.
-     * @param string $fractionalSeparator
+     * @param BigNumberFormatter $formatter
+     * @param SumArgumentsFactory $sumArgumentsFactory
      */
-    public function __construct($fractionalSeparator = '.')
+    public function __construct(BigNumberFormatter $formatter, SumArgumentsFactory $sumArgumentsFactory)
     {
-        $this->fractionalSeparator = $fractionalSeparator;
+        $this->formatter = $formatter;
+        $this->sumArgumentsFactory = $sumArgumentsFactory;
     }
 
     /**
@@ -30,99 +38,63 @@ class Calculator
      */
     public function sum(string $base, string $add): string
     {
-        $this->assertArgument($base);
-        $this->assertArgument($add);
+        $arguments = $this->createSumArguments($base, $add);
+        $result = $this->sumArgument($arguments);
 
-        [$baseInteger, $baseFractional] = $this->splitOperand($base);
-        [$addInteger, $addFractional] = $this->splitOperand($add);
-
-        [$baseInteger, $addInteger] = $this->padParts($baseInteger, $addInteger, self::INTEGER_PART);
-        [$baseFractional, $addFractional] = $this->padParts($baseFractional, $addFractional, self::FRACTIONAL_PART);
-
-
-        [$fractional, $addDec] = $this->sumInteger($baseFractional, $addFractional);
-        [$integer, $addDec] = $this->sumInteger($baseInteger, $addInteger, $addDec);
-        if ($addDec) {
-            $integer = '1' . $integer;
-        }
-
-        $fractional = rtrim($fractional, '0');
-        $integer = ltrim($integer, '0');
-        if ('' === $integer) {
-            $integer = '0';
-        }
-
-        if ($fractional === '') {
-            return $integer;
-        }
-
-        return $integer.$this->fractionalSeparator.$fractional;
+        return $this->formatter->format($result);
     }
 
     /**
-     * @param string $operand
-     * @return array
-     */
-    private function splitOperand(string $operand): array
-    {
-        $result = explode($this->fractionalSeparator, $operand);
-        $integer = array_shift($result);
-        $fractional = array_shift($result);
-
-        if (!$integer) {
-            $integer = '0';
-        }
-        if (!$fractional) {
-            $fractional = '0';
-        }
-
-        return [$integer, $fractional];
-    }
-
-    /**
-     * @param $operand
+     * @param $base
+     * @param $add
+     * @return SumArguments
      * @throws CalculatorException
      */
-    private function assertArgument($operand): void
+    private function createSumArguments($base, $add): SumArguments
     {
-        if (!is_numeric($operand)) {
-            throw new CalculatorException(
-                sprintf(
-                    'Operand should be a numeric value, "%s" given.',
-                    is_object($operand) ? get_class($operand) : gettype($operand)
-                )
-            );
-        }
+        return $this->sumArgumentsFactory->create(BigNumber::fromString($base), BigNumber::fromString($add));
     }
 
-    private function padParts(string $base, string $add, $part)
+    /**
+     * @param SumArguments $arguments
+     * @return BigNumber
+     * @throws CalculatorException
+     */
+    private function sumArgument(SumArguments $arguments): BigNumber
     {
-        $lenBase = \strlen($base);
-        $lenAdd = \strlen($add);
-        if ($lenAdd === $lenBase) {
-            return [$base, $add];
+        [$result, $dig] = $this->sumInteger($arguments->getOperand1(), $arguments->getOperand2());
+        if (!$dig && '0' === $result) {
+            return new BigNumber();
         }
 
-        if ($lenBase < $lenAdd) {
-            [$base, $add] = [$add, $base];
-            $lenBase = $lenAdd;
+        if ($dig) {
+            $result = '1'.$result;
         }
 
-        if ($part === self::INTEGER_PART) {
-            $add = str_pad($add, $lenBase, '0', STR_PAD_LEFT);
-        } else {
-            $add = str_pad($add, $lenBase, '0',STR_PAD_RIGHT);
+        $start = 0 - $arguments->getFractionalLength();
+        $int = substr($result, 0, $start);
+        if (!$int) {
+            $int = '0';
         }
+        $fra = substr($result, $start);
 
-        return [$base, $add];
+        return new BigNumber($int, $fra);
     }
 
-    private function sumInteger($operand1, $operand2, $addInt = false): array
+
+    /**
+     * @param string $operand1
+     * @param string $operand2
+     * @param bool $addInt
+     * @return array
+     */
+    private function sumInteger(string $operand1, string $operand2, $addInt = false): array
     {
-        if (0 == $operand1) {
+        if (0 === (int)$operand1 && 0 === (int)$operand2) {
             if ($addInt) {
                 return ['1', false];
             }
+
             return ['0', false];
         }
         $splitLength = 10;
@@ -134,8 +106,8 @@ class Calculator
         for ($count; $count > 0; $count--) {
 
             $key = $count - 1;
-            $val1 = (int) $arr1[$key];
-            $val2 = (int) $arr2[$key];
+            $val1 = (int)$arr1[$key];
+            $val2 = (int)$arr2[$key];
             $l = \strlen($val1);
 
             if ($addInt) {
@@ -143,8 +115,7 @@ class Calculator
                 $addInt = false;
             }
 
-
-            $res = (string) ($val1 + $val2);
+            $res = (string)($val1 + $val2);
             if (\strlen($res) > $l) {
                 $res = substr($res, 1);
                 $addInt = true;
@@ -156,6 +127,4 @@ class Calculator
 
         return [$result, $addInt];
     }
-
-
 }
